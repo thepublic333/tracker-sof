@@ -1,5 +1,3 @@
-pip install playwright
-playwright install chromium
 import requests
 from bs4 import BeautifulSoup
 import gspread
