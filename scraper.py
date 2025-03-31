@@ -29,8 +29,9 @@ params = {
     "bounds[ne_long]": 311.4988519149046
 }
 
-response = requests.get(url, params=params)
+response = requests.get(url, params=params, timeout=60)
 data = response.json()
+
 
 # Extract provider info
 provider_data = []
