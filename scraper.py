@@ -29,16 +29,24 @@ params = {
     "bounds[ne_long]": 311.4988519149046
 }
 
-response = requests.get(url, params=params, timeout=60)
+headers = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+    "Referer": "https://sofwave.com/",
+    "Origin": "https://sofwave.com"
+}
+
+response = requests.get(url, params=params, headers=headers, timeout=60)
 data = response.json()
 
+providers = data.get("providers", [])
+print(f"Got {len(providers)} providers")
 
-# Extract provider info
 provider_data = []
-for provider in data.get("providers", []):
+for provider in providers:
     name = provider.get("name", "N/A")
     location = provider.get("formatted_address", "N/A")
     provider_data.append([name, location])
+
 
 # Update the Google Sheet
 sheet.clear()
