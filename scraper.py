@@ -3,6 +3,8 @@ import gspread
 from google.oauth2.service_account import Credentials
 import os
 import json
+from datetime import datetime
+from collections import defaultdict
 import time
 
 # === 1. Load Google Sheets credentials ===
@@ -16,12 +18,34 @@ scopes = [
 
 creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
 client = gspread.authorize(creds)
-sheet = client.open("Sofwave Provider Data").sheet1
 
-# === 2. Wait before sending request (optional mimic human) ===
-time.sleep(3)
+# === 2. Setup sheet handles ===
+sheet = client.open("Sofwave Provider Data")
+log_sheet = sheet.worksheet("Log")
+summary_sheet = sheet.worksheet("DailySummary")
 
-# === 3. API Call ===
+# === 3. Helpers ===
+def extract_country(address):
+    return address.split(",")[-1].strip() if "," in address else "N/A"
+
+def get_existing_provider_names():
+    records = log_sheet.get_all_records()
+    return set(row['Name'] for row in records)
+
+def update_country_headers(existing_headers, today_country_counts):
+    updated = False
+    for country in today_country_counts:
+        if country not in existing_headers:
+            existing_headers.append(country)
+            updated = True
+    if updated:
+        summary_sheet.resize(rows=summary_sheet.row_count, cols=len(existing_headers))
+        summary_sheet.update("A1", [existing_headers])
+    return existing_headers
+
+# === 4. Scrape Sofwave API ===
+time.sleep(3)  # simulate human delay
+
 url = "https://api.sofwave.com/wp-json/cherami/v1/provider"
 params = {
     "is_resume": "true",
@@ -32,7 +56,6 @@ params = {
     "bounds[ne_lat]": 85.05112877980659,
     "bounds[ne_long]": 412.1170412711306
 }
-
 headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0",
     "Referer": "https://sofwave.com/",
@@ -43,21 +66,45 @@ headers = {
 
 response = requests.get(url, headers=headers, params=params, timeout=60)
 data = response.json()
-
 providers = data.get("items", [])
+
 print(f"✅ Retrieved {len(providers)} providers")
 
-# === 4. Extract provider info ===
-provider_data = []
+# === 5. Diff + log ===
+today = datetime.utcnow().strftime("%Y-%m-%d")
+existing_names = get_existing_provider_names()
+
+new_providers = []
+country_counts = defaultdict(int)
+
 for provider in providers:
     name = provider.get("title", "N/A")
     billing = provider.get("billing", {})
-    location = billing.get("address", "N/A")
-    provider_data.append([name, location])
+    address = billing.get("address", "N/A")
+    country = extract_country(address)
 
-# === 5. Push to Google Sheets ===
-sheet.clear()
-sheet.append_row(["Total Providers", len(provider_data)])
-sheet.append_row([])
-sheet.append_row(["Name", "Location"])
-sheet.append_rows(provider_data)
+    country_counts[country] += 1
+
+    if name not in existing_names:
+        new_providers.append([today, name, country, address])
+
+# Append new entries to log
+if new_providers:
+    log_sheet.append_rows(new_providers)
+
+# === 6. Update summary ===
+existing_headers = summary_sheet.row_values(1)
+if not existing_headers:
+    existing_headers = ["Date", "Total Providers", "New Providers"]
+
+# Expand country columns if needed
+existing_headers = update_country_headers(existing_headers, country_counts)
+
+# Prepare summary row
+summary_row = [today, len(providers), len(new_providers)]
+for country in existing_headers[3:]:  # skip Date, Total, New
+    summary_row.append(country_counts.get(country, 0))
+
+summary_sheet.append_row(summary_row)
+
+print(f"📊 Summary updated: {summary_row}")
