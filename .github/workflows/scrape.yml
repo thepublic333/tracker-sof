@@ -2,8 +2,8 @@ name: Daily Sofwave Scraper
 
 on:
   schedule:
-    - cron: '0 9 * * *' # Runs daily at 09:00 AM UTC
-  workflow_dispatch: # Also allows manual trigger
+    - cron: '0 9 * * *'  # Daily at 09:00 UTC
+  workflow_dispatch:     # Manual trigger available
 
 jobs:
   scrape-data:
@@ -17,11 +17,12 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install Python dependencies
+      - name: Install Dependencies (Playwright + Google Sheets)
         run: |
-          pip install requests beautifulsoup4 gspread google-auth
+          pip install playwright gspread google-auth
+          playwright install chromium
 
-      - name: Run your Python scraping script
+      - name: Run Playwright Scraper
         env:
           GDRIVE_CREDENTIALS: ${{ secrets.GDRIVE_CREDENTIALS }}
         run: |
