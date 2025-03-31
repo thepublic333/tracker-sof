@@ -6,6 +6,7 @@ import json
 from datetime import datetime
 from collections import defaultdict
 import time
+import pycountry
 
 # === 1. Load Google Sheets credentials ===
 creds_json = os.getenv('GDRIVE_CREDENTIALS')
@@ -24,7 +25,28 @@ sheet = client.open("Sofwave Provider Data")
 log_sheet = sheet.worksheet("Log")
 summary_sheet = sheet.worksheet("DailySummary")
 
-# === 3. Helpers ===
+# === 3. Country normalization ===
+def normalize_country(code_or_name):
+    if not code_or_name or not isinstance(code_or_name, str):
+        return "Null"
+
+    code = code_or_name.strip().upper()
+
+    try:
+        # Try ISO 2-letter and 3-letter
+        country = pycountry.countries.get(alpha_2=code) or pycountry.countries.get(alpha_3=code)
+        if country:
+            return country.name
+    except:
+        pass
+
+    try:
+        # Try fuzzy match (name)
+        return pycountry.countries.lookup(code).name
+    except:
+        return "Null"
+
+# === 4. Helpers ===
 def get_existing_provider_names():
     records = log_sheet.get_all_records()
     return set(row['Name'] for row in records)
@@ -40,7 +62,7 @@ def update_country_headers(existing_headers, today_country_counts):
         summary_sheet.update("A1", [existing_headers])
     return existing_headers
 
-# === 4. Scrape Sofwave API ===
+# === 5. Scrape Sofwave API ===
 time.sleep(3)  # simulate human delay
 
 url = "https://api.sofwave.com/wp-json/cherami/v1/provider"
@@ -67,7 +89,7 @@ providers = data.get("items", [])
 
 print(f"✅ Retrieved {len(providers)} providers")
 
-# === 5. Diff + log ===
+# === 6. Diff + log ===
 today = datetime.utcnow().strftime("%Y-%m-%d")
 existing_names = get_existing_provider_names()
 
@@ -77,8 +99,9 @@ country_counts = defaultdict(int)
 for provider in providers:
     name = provider.get("title", "N/A")
     billing = provider.get("billing", {})
+    raw_country = billing.get("country", None)
+    country = normalize_country(raw_country)
     address = billing.get("address", "N/A")
-    country = billing.get("country", "N/A")
 
     country_counts[country] += 1
 
@@ -89,7 +112,7 @@ for provider in providers:
 if new_providers:
     log_sheet.append_rows(new_providers)
 
-# === 6. Update summary ===
+# === 7. Update summary ===
 existing_headers = summary_sheet.row_values(1)
 if not existing_headers:
     existing_headers = ["Date", "Total Providers", "New Providers"]
