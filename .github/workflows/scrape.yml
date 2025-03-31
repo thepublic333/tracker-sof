@@ -1,0 +1,28 @@
+name: Daily Sofwave Scraper
+
+on:
+  schedule:
+    - cron: '0 9 * * *' # Runs daily at 09:00 AM UTC
+  workflow_dispatch: # Also allows manual trigger
+
+jobs:
+  scrape-data:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          pip install requests beautifulsoup4 gspread google-auth
+
+      - name: Run your Python scraping script
+        env:
+          GDRIVE_CREDENTIALS: ${{ secrets.GDRIVE_CREDENTIALS }}
+        run: |
+          scraper.py
