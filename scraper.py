@@ -1,10 +1,8 @@
-import requests
-from bs4 import BeautifulSoup
+from playwright.sync_api import sync_playwright
 import gspread
 from google.oauth2.service_account import Credentials
-from datetime import datetime
-import os
 import json
+import os
 
 # Load Google Sheets credentials from environment variable
 creds_json = os.getenv('GDRIVE_CREDENTIALS')
