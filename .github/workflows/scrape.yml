@@ -1,12 +1,12 @@
-name: Daily Sofwave Scraper
+name: Daily Sofwave API Scraper
 
 on:
   schedule:
-    - cron: '0 9 * * *'  # Daily at 09:00 UTC
-  workflow_dispatch:     # Manual trigger available
+    - cron: '0 9 * * *'  # Every day at 09:00 UTC
+  workflow_dispatch:     # Allow manual trigger
 
 jobs:
-  scrape-data:
+  run-script:
     runs-on: ubuntu-latest
 
     steps:
@@ -17,12 +17,11 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install Dependencies (Playwright + Google Sheets)
+      - name: Install dependencies
         run: |
-          pip install playwright gspread google-auth
-          playwright install chromium
+          pip install requests gspread google-auth
 
-      - name: Run Playwright Scraper
+      - name: Run scraper
         env:
           GDRIVE_CREDENTIALS: ${{ secrets.GDRIVE_CREDENTIALS }}
         run: |
