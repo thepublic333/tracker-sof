@@ -25,9 +25,6 @@ log_sheet = sheet.worksheet("Log")
 summary_sheet = sheet.worksheet("DailySummary")
 
 # === 3. Helpers ===
-def extract_country(address):
-    return address.split(",")[-1].strip() if "," in address else "N/A"
-
 def get_existing_provider_names():
     records = log_sheet.get_all_records()
     return set(row['Name'] for row in records)
@@ -81,7 +78,8 @@ for provider in providers:
     name = provider.get("title", "N/A")
     billing = provider.get("billing", {})
     address = billing.get("address", "N/A")
-    country = extract_country(address)
+    situation = provider.get("situation", {})
+    country = situation.get("country", "N/A")
 
     country_counts[country] += 1
 
