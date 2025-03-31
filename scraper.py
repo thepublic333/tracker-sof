@@ -78,8 +78,7 @@ for provider in providers:
     name = provider.get("title", "N/A")
     billing = provider.get("billing", {})
     address = billing.get("address", "N/A")
-    situation = provider.get("situation", {})
-    country = situation.get("country", "N/A")
+    country = billing.get("country", "N/A")
 
     country_counts[country] += 1
 
