@@ -1,4 +1,5 @@
-
+pip install playwright
+playwright install chromium
 import requests
 from bs4 import BeautifulSoup
 import gspread
@@ -17,37 +18,35 @@ creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
 client = gspread.authorize(creds)
 sheet = client.open("Sofwave Provider Data").sheet1
 
-# Web scraping
-url = "https://sofwave.com/find-a-provider"
-response = requests.get(url)
-soup = BeautifulSoup(response.text, 'html.parser')
 
-# Initialize lists to store provider data
+# Scraping with Playwright
 provider_data = []
 
-# Find all provider elements
-providers = soup.find_all('li', class_='_7duKOn')
+with sync_playwright() as p:
+    browser = p.chromium.launch(headless=True)
+    page = browser.new_page()
 
-# Extract data from each provider
-for provider in providers:
-    try:
-        name = provider.find('span', class_='SSM3JD').text.strip()
-        address = provider.find('div', class_='Ko5cpW').text.strip()
-        provider_id = provider['data-id']
-        provider_data.append([name, address, provider_id])
-    except AttributeError:
-        continue
+    # Load the provider page
+    page.goto("https://sofwave.com/find-a-provider", timeout=60000)
+    page.wait_for_selector('li._7duKOn')
 
-# Update the sheet
-# Clear previous sheet content
+    # Get all provider elements
+    providers = page.query_selector_all('li._7duKOn')
+
+    for provider in providers:
+        name_elem = provider.query_selector('span.SSM3JD')
+        address_elem = provider.query_selector('div.Ko5cpW')
+
+        name = name_elem.inner_text().strip() if name_elem else 'N/A'
+        address = address_elem.inner_text().strip() if address_elem else 'N/A'
+
+        provider_data.append([name, address])
+
+    browser.close()
+
+# Update Google Sheet
 sheet.clear()
-
-# Insert total count at the top
 sheet.append_row(["Total Providers", len(provider_data)])
-
-# Leave one empty row, then set headers
 sheet.append_row([])
 sheet.append_row(["Name", "Location"])
-
-# Append each provider as a separate row
 sheet.append_rows(provider_data)
