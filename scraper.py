@@ -29,14 +29,19 @@ summary_sheet = sheet.worksheet("DailySummary")
 def normalize_country(code_or_name):
     if not code_or_name or not isinstance(code_or_name, str):
         return "Null"
+
     code = code_or_name.strip().upper()
+
     try:
+        # Try ISO 2-letter and 3-letter
         country = pycountry.countries.get(alpha_2=code) or pycountry.countries.get(alpha_3=code)
         if country:
             return country.name
     except:
         pass
+
     try:
+        # Try fuzzy match (name)
         return pycountry.countries.lookup(code).name
     except:
         return "Null"
@@ -57,18 +62,8 @@ def update_country_headers(existing_headers, today_country_counts):
         summary_sheet.update("A1", [existing_headers])
     return existing_headers
 
-def extract_logo_upload_date(url):
-    try:
-        parts = url.split("/")
-        year_index = parts.index("uploads") + 1
-        year = parts[year_index]
-        month = parts[year_index + 1]
-        return f"{year}-{month}-01"
-    except:
-        return "Null"
-
 # === 5. Scrape Sofwave API ===
-time.sleep(3)
+time.sleep(3)  # simulate human delay
 
 url = "https://api.sofwave.com/wp-json/cherami/v1/provider"
 params = {
@@ -108,21 +103,12 @@ for provider in providers:
     country = normalize_country(raw_country)
     address = billing.get("address", "N/A")
 
-    # Safely extract logo upload date
-    informations = provider.get("informations", {})
-    logo = informations.get("logo", {})
-    logo_url = logo.get("url", "")
-    logo_date = extract_logo_upload_date(logo_url)
+    country_counts[country] += 1
 
     if name not in existing_names:
-        new_providers.append([today, name, country, address, logo_date])
-        country_counts[country] += 1
+        new_providers.append([today, name, country, address])
 
-# === Add headers if sheet is new ===
-if log_sheet.row_count == 0 or not log_sheet.row_values(1):
-    log_sheet.append_row(["Date", "Name", "Country", "Address", "Logo Upload Date"])
-
-# Append new entries
+# Append new entries to log
 if new_providers:
     log_sheet.append_rows(new_providers)
 
@@ -131,10 +117,12 @@ existing_headers = summary_sheet.row_values(1)
 if not existing_headers:
     existing_headers = ["Date", "Total Providers", "New Providers"]
 
+# Expand country columns if needed
 existing_headers = update_country_headers(existing_headers, country_counts)
 
+# Prepare summary row
 summary_row = [today, len(providers), len(new_providers)]
-for country in existing_headers[3:]:
+for country in existing_headers[3:]:  # skip Date, Total, New
     summary_row.append(country_counts.get(country, 0))
 
 summary_sheet.append_row(summary_row)
