@@ -9,7 +9,10 @@ scopes = [
     "https://www.googleapis.com/auth/drive"
 ]
 
-creds = Credentials.from_service_account_file("credentials.json", scopes=scopes)
+creds_json = os.getenv('GDRIVE_CREDENTIALS')
+creds_dict = json.loads(creds_json)
+creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
+
 client = gspread.authorize(creds)
 sheet = client.open("Sofwave Provider Data")
 korea_sheet = sheet.worksheet("Korea")
