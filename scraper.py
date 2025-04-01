@@ -30,24 +30,27 @@ summary_sheet = sheet.worksheet("DailySummary")
 def normalize_country(code_or_name):
     if not code_or_name or not isinstance(code_or_name, str):
         return "Null"
-
     code = code_or_name.strip().upper()
-
     try:
-        # Try ISO 2-letter and 3-letter
         country = pycountry.countries.get(alpha_2=code) or pycountry.countries.get(alpha_3=code)
         if country:
             return country.name
     except:
         pass
-
     try:
-        # Try fuzzy match (name)
         return pycountry.countries.lookup(code).name
     except:
         return "Null"
 
-# === 4. Helpers ===
+# === 4. Extract upload date from logo URL ===
+def extract_logo_upload_date(url: str) -> str:
+    match = re.search(r'/(\d{4})/(\d{2})/', url)
+    if match:
+        year, month = match.groups()
+        return f"{year}-{month}"
+    return "Null"
+
+# === 5. Helpers ===
 def get_existing_provider_names():
     records = log_sheet.get_all_records()
     return set(row['Name'] for row in records)
@@ -63,18 +66,7 @@ def update_country_headers(existing_headers, today_country_counts):
         summary_sheet.update("A1", [existing_headers])
     return existing_headers
 
-def extract_logo_upload_date(provider):
-    try:
-        logo_url = provider.get("informations", {}).get("logo", {}).get("url", "")
-        match = re.search(r'/(\d{4})/(\d{2})/', logo_url)
-        if match:
-            year, month = match.groups()
-            return datetime(int(year), int(month), 1).strftime('%Y-%m-%d')
-    except:
-        pass
-    return "Unknown"
-
-# === 5. Scrape Sofwave API ===
+# === 6. Scrape Sofwave API ===
 time.sleep(3)  # simulate human delay
 
 url = "https://api.sofwave.com/wp-json/cherami/v1/provider"
@@ -101,16 +93,16 @@ providers = data.get("items", [])
 
 print(f"✅ Retrieved {len(providers)} providers")
 
-# === 6. Diff + log ===
+# === 7. Diff + log ===
 today = datetime.utcnow().strftime("%Y-%m-%d")
 existing_names = get_existing_provider_names()
 
-# Ensure header exists
-if not log_sheet.row_values(1):
-    log_sheet.insert_row(["Date", "Name", "Country", "Address", "Logo Upload Date"], index=1)
-
 new_providers = []
 country_counts = defaultdict(int)
+
+# Ensure headers are present in the log sheet
+if not log_sheet.row_values(1):
+    log_sheet.append_row(["Date", "Name", "Country", "Address", "Logo Upload Date"])
 
 for provider in providers:
     name = provider.get("title", "N/A")
@@ -118,18 +110,18 @@ for provider in providers:
     raw_country = billing.get("country", None)
     country = normalize_country(raw_country)
     address = billing.get("address", "N/A")
-    logo_upload_date = extract_logo_upload_date(provider)
-
-    country_counts[country] += 1
+    logo_url = provider.get("informations", {}).get("logo", {}).get("url", "")
+    logo_upload_date = extract_logo_upload_date(logo_url)
 
     if name not in existing_names:
         new_providers.append([today, name, country, address, logo_upload_date])
+        country_counts[country] += 1
 
 # Append new entries to log
 if new_providers:
     log_sheet.append_rows(new_providers)
 
-# === 7. Update summary ===
+# === 8. Update summary ===
 existing_headers = summary_sheet.row_values(1)
 if not existing_headers:
     existing_headers = ["Date", "Total Providers", "New Providers"]
