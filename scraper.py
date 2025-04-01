@@ -7,7 +7,6 @@ from datetime import datetime
 from collections import defaultdict
 import time
 import pycountry
-import re
 
 # === 1. Load Google Sheets credentials ===
 creds_json = os.getenv('GDRIVE_CREDENTIALS')
@@ -42,13 +41,20 @@ def normalize_country(code_or_name):
     except:
         return "Null"
 
-# === 4. Extract upload date from logo URL ===
-def extract_logo_upload_date(url: str) -> str:
-    match = re.search(r'/(\d{4})/(\d{2})/', url)
-    if match:
-        year, month = match.groups()
-        return f"{year}-{month}"
-    return "Null"
+# === 4. Extract logo upload date ===
+def extract_logo_upload_date(url):
+    try:
+        if not url:
+            return "Null"
+        parts = url.split("/uploads/")
+        if len(parts) < 2:
+            return "Null"
+        date_part = parts[1].split("/")[0:2]  # ['2025', '03']
+        if len(date_part) != 2:
+            return "Null"
+        return f"{date_part[0]}-{date_part[1]}-01"
+    except:
+        return "Null"
 
 # === 5. Helpers ===
 def get_existing_provider_names():
@@ -100,25 +106,26 @@ existing_names = get_existing_provider_names()
 new_providers = []
 country_counts = defaultdict(int)
 
-# Ensure headers are present in the log sheet
-if not log_sheet.row_values(1):
-    log_sheet.append_row(["Date", "Name", "Country", "Address", "Logo Upload Date"])
-
 for provider in providers:
     name = provider.get("title", "N/A")
     billing = provider.get("billing", {})
     raw_country = billing.get("country", None)
     country = normalize_country(raw_country)
     address = billing.get("address", "N/A")
+
+    # Try to extract logo upload date
     logo_url = provider.get("informations", {}).get("logo", {}).get("url", "")
-    logo_upload_date = extract_logo_upload_date(logo_url)
+    logo_date = extract_logo_upload_date(logo_url)
 
     if name not in existing_names:
-        new_providers.append([today, name, country, address, logo_upload_date])
+        new_providers.append([today, name, country, address, logo_date])
         country_counts[country] += 1
 
 # Append new entries to log
 if new_providers:
+    # Ensure headers exist
+    if not log_sheet.row_values(1):
+        log_sheet.append_row(["Date", "Name", "Country", "Address", "Logo Upload Date"])
     log_sheet.append_rows(new_providers)
 
 # === 8. Update summary ===
