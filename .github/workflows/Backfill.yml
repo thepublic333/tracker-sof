@@ -1,0 +1,30 @@
+name: Backfill Logo Upload Dates
+
+on:
+  workflow_dispatch:  # Allows manual runs from the GitHub UI
+  schedule:
+    - cron: '0 9 * * *'  # Optional: run daily at 9 AM UTC
+
+jobs:
+  backfill-logo-dates:
+    runs-on: ubuntu-latest
+
+    env:
+      GDRIVE_CREDENTIALS: ${{ secrets.GDRIVE_CREDENTIALS }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.12
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run backfill script
+        run: python backfill_logo_dates.py
