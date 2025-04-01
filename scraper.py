@@ -42,19 +42,25 @@ def normalize_country(code_or_name):
         return "Null"
 
 # === 4. Extract logo upload date ===
-def extract_logo_upload_date(url):
+def extract_logo_upload_date(provider):
     try:
-        if not url:
-            return "Null"
-        parts = url.split("/uploads/")
-        if len(parts) < 2:
-            return "Null"
-        date_part = parts[1].split("/")[0:2]  # ['2025', '03']
-        if len(date_part) != 2:
-            return "Null"
-        return f"{date_part[0]}-{date_part[1]}-01"
+        informations = provider.get("informations")
+        if not informations or not isinstance(informations, dict):
+            return "Unknown"
+        
+        logo = informations.get("logo")
+        if not logo or not isinstance(logo, dict):
+            return "Unknown"
+        
+        logo_url = logo.get("url", "")
+        match = re.search(r'/(\d{4})/(\d{2})/', logo_url)
+        if match:
+            year, month = match.groups()
+            return datetime(int(year), int(month), 1).strftime('%Y-%m-%d')
     except:
-        return "Null"
+        pass
+    return "Unknown"
+
 
 # === 5. Helpers ===
 def get_existing_provider_names():
