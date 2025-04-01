@@ -1,3 +1,4 @@
+import os
 import requests
 import gspread
 from datetime import datetime
