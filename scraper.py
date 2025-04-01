@@ -7,6 +7,7 @@ from datetime import datetime
 from collections import defaultdict
 import time
 import pycountry
+import re
 
 # === 1. Load Google Sheets credentials ===
 creds_json = os.getenv('GDRIVE_CREDENTIALS')
@@ -62,6 +63,17 @@ def update_country_headers(existing_headers, today_country_counts):
         summary_sheet.update("A1", [existing_headers])
     return existing_headers
 
+def extract_logo_upload_date(provider):
+    try:
+        logo_url = provider.get("informations", {}).get("logo", {}).get("url", "")
+        match = re.search(r'/(\d{4})/(\d{2})/', logo_url)
+        if match:
+            year, month = match.groups()
+            return datetime(int(year), int(month), 1).strftime('%Y-%m-%d')
+    except:
+        pass
+    return "Unknown"
+
 # === 5. Scrape Sofwave API ===
 time.sleep(3)  # simulate human delay
 
@@ -93,6 +105,10 @@ print(f"✅ Retrieved {len(providers)} providers")
 today = datetime.utcnow().strftime("%Y-%m-%d")
 existing_names = get_existing_provider_names()
 
+# Ensure header exists
+if not log_sheet.row_values(1):
+    log_sheet.insert_row(["Date", "Name", "Country", "Address", "Logo Upload Date"], index=1)
+
 new_providers = []
 country_counts = defaultdict(int)
 
@@ -102,11 +118,12 @@ for provider in providers:
     raw_country = billing.get("country", None)
     country = normalize_country(raw_country)
     address = billing.get("address", "N/A")
+    logo_upload_date = extract_logo_upload_date(provider)
 
     country_counts[country] += 1
 
     if name not in existing_names:
-        new_providers.append([today, name, country, address])
+        new_providers.append([today, name, country, address, logo_upload_date])
 
 # Append new entries to log
 if new_providers:
